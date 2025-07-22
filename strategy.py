@@ -9,13 +9,18 @@ def predict_signal(data):
     price = data.get("price", 0)
     symbol = data.get("symbol", "")
     
-    if price < 70000:
-        signal = "BUY"
-    else:
-        signal = "SELL"
+    if rsi < 30:
+    signal = "BUY"
+elif rsi > 70:
+    signal = "SELL"
+else:
+    signal = "HOLD"
 
-    tp = price + 1000
-    sl = price - 1000
+# Atur TP/SL dalam pip (contoh: 50 pip = 0.0050)
+pip_size = 0.0001  # Untuk EURUSD
+tp = price + (50 * pip_size) if signal == "BUY" else price - (50 * pip_size)
+sl = price - (50 * pip_size) if signal == "BUY" else price + (50 * pip_size)
+
 
     return {
         "signal": signal,
