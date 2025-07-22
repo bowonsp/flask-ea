@@ -1,57 +1,54 @@
-import openai
 import os
-import json
+import openai
 
-# Ambil API key dari environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def predict_signal(data):
-    """
-    Kirim data ke OpenAI GPT dan dapatkan sinyal trading.
-    """
-
     price = data.get("price", 0)
     symbol = data.get("symbol", "")
     rsi = data.get("rsi", 50)
 
     prompt = f"""
-Saya adalah asisten trading. Berikut ini adalah data terbaru:
-
-- Symbol: {symbol}
-- Harga: {price}
-- RSI: {rsi}
-
-Berdasarkan data tersebut, apakah sebaiknya BUY, SELL, atau HOLD?
-Berikan juga nilai TP dan SL yang wajar dalam format JSON seperti ini:
-
-{{
-  "signal": "BUY" atau "SELL" atau "HOLD",
-  "tp": float,
-  "sl": float
-}}
+    Symbol: {symbol}
+    Price: {price}
+    RSI: {rsi}
+    
+    Berdasarkan data di atas, apakah sinyal trading yang sesuai? Jawab hanya dengan: BUY, SELL, atau HOLD.
     """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # atau gpt-3.5-turbo kalau kamu pakai versi gratisan
+        response = openai.chat.completions.create(
+            model="gpt-4",  # atau gpt-3.5-turbo
             messages=[
-                {"role": "system", "content": "Kamu adalah analis trading profesional. Jawaban harus dalam format JSON."},
+                {"role": "system", "content": "Kamu adalah analis trading profesional."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2
+            temperature=0.2,
         )
 
-        result_text = response['choices'][0]['message']['content']
+        signal_text = response.choices[0].message.content.strip().upper()
 
-        # Coba parsing JSON
-        result = json.loads(result_text)
+        # Hitung TP/SL berdasarkan sinyal
+        pip_size = 1 if price > 1000 else 0.0001  # misal BTC/USD vs EUR/USD
+        if signal_text == "BUY":
+            tp = price + 50 * pip_size
+            sl = price - 50 * pip_size
+        elif signal_text == "SELL":
+            tp = price - 50 * pip_size
+            sl = price + 50 * pip_size
+        else:
+            tp = sl = price
 
-        return result
+        return {
+            "signal": signal_text,
+            "tp": tp,
+            "sl": sl
+        }
 
     except Exception as e:
         return {
+            "error": str(e),
             "signal": "HOLD",
             "tp": price,
-            "sl": price,
-            "error": str(e)
+            "sl": price
         }
