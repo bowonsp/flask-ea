@@ -2,57 +2,51 @@ from flask import Flask, request, jsonify
 import openai
 import os
 
-# Inisialisasi Flask dan OpenAI
 app = Flask(__name__)
-openai_api_key = os.getenv("OPENAI_API_KEY")
 
-if not openai_api_key:
-    raise RuntimeError("OPENAI_API_KEY tidak ditemukan di environment variables.")
+# Ganti dengan OpenAI API key kamu
+openai.api_key = os.getenv("OPENAI_API_KEY", "sk-xxx")  # Bisa diatur di Render as environment variable
 
-client = openai.OpenAI(api_key=openai_api_key)
-
-# Fungsi bantu buat prompt dari data candle
-def build_prompt(data):
-    close_prices = data.get("close", [])
-    symbol = data.get("symbol", "UNKNOWN")
-    timeframe = data.get("timeframe", "M1")
-    
-    prompt = (
-        f"Analisis sinyal trading berdasarkan data harga penutupan berikut untuk {symbol} timeframe {timeframe}:\n"
-        f"{close_prices}\n\n"
-        "Berdasarkan data ini, apakah sinyal trading saat ini adalah BUY, SELL, atau HOLD? "
-        "Jawab hanya dengan salah satu: BUY, SELL, atau HOLD."
-    )
-    return prompt
+@app.route("/")
+def index():
+    return "EA Flask Server is running."
 
 @app.route("/signal", methods=["POST"])
 def signal():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "Data JSON tidak valid"}), 400
+        if not data or "close" not in data:
+            return jsonify({"error": "Invalid request. 'close' data missing."}), 400
 
-        prompt = build_prompt(data)
-
-        # Kirim ke OpenAI
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Kamu adalah asisten trading."},
-                {"role": "user", "content": prompt}
-            ]
+        close = data["close"]
+        prompt = (
+            f"Berdasarkan data penutupan 10 candle terakhir: {close}, "
+            f"berikan sinyal trading (BUY / SELL / HOLD) berdasarkan tren, EMA, dan Bollinger Bands. "
+            f"Jawab dalam format JSON misalnya: {{\"signal\": \"BUY\", \"sl\": 1.12345, \"tp\": 1.12500}}"
         )
 
-        ai_reply = response.choices[0].message.content.strip().upper()
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Kamu adalah analis trading profesional."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
 
-        # Validasi respons
-        if ai_reply not in ["BUY", "SELL", "HOLD"]:
-            return jsonify({"signal": "HOLD", "note": "Respons AI tidak dikenali: " + ai_reply}), 200
+        ai_reply = response.choices[0].message["content"]
 
-        return jsonify({"signal": ai_reply})
+        # Coba parse hasil AI sebagai JSON (jika valid)
+        try:
+            import json
+            parsed = json.loads(ai_reply)
+            return jsonify(parsed)
+        except Exception:
+            return jsonify({"error": "AI response tidak dalam format JSON", "raw": ai_reply}), 400
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # agar bisa di-host di Render.com
+    app.run(host="0.0.0.0", port=port)
