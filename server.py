@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 @app.route('/signal', methods=['POST'])
 def signal():
-    data = request.get_json()
+    data = request.get_json(force=True)
     try:
         symbol = data.get("symbol")
         close_prices = data.get("close", [])
