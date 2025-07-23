@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from strategi import generate_signal
+from strategy import generate_signal
 
 app = Flask(__name__)
 
