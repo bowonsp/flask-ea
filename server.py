@@ -1,26 +1,27 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os
-from strategy import generate_signal
 
 app = Flask(__name__)
-CORS(app)  # <- penting
 
-@app.route('/signal', methods=['POST'])
+@app.route("/signal", methods=["POST"])
 def signal():
-    try:
-        data = request.get_json(force=True)
-        symbol = data.get("symbol")
-        close_prices = data.get("close", [])
+    data = request.get_json(force=True, silent=True)
+    if data is None:
+        return jsonify({"error": "Invalid or no JSON received"}), 400
 
-        if not symbol or not close_prices:
-            return jsonify({"error": "Missing symbol or close data"}), 400
+    # Debug log
+    print("Received data:", data)
 
-        result = generate_signal(close_prices)
-        return jsonify({"signal": result}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    symbol = data.get("symbol")
+    timeframe = data.get("timeframe")
+    close = data.get("close")
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    if not symbol or not timeframe or not close:
+        return jsonify({"error": "Missing fields"}), 400
+
+    # Logika prediksi sederhana
+    if close[-1] > close[-2]:
+        return jsonify({"signal": "BUY"})
+    elif close[-1] < close[-2]:
+        return jsonify({"signal": "SELL"})
+    else:
+        return jsonify({"signal": "HOLD"})
