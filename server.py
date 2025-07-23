@@ -1,48 +1,35 @@
 from flask import Flask, request, jsonify
-import openai
+from strategi import generate_signal
 
 app = Flask(__name__)
 
-# Ganti ini dengan API key kamu sendiri
-openai.api_key = "YOUR_OPENAI_API_KEY"
-
-@app.route('/')
-def home():
-    return 'AI Flask EA server is running.'
+@app.route('/', methods=['GET'])
+def index():
+    return '✅ Flask EA Signal Server is running!'
 
 @app.route('/signal', methods=['POST'])
 def signal():
     try:
-        data = request.get_json()
+        # Ambil data dari EA
+        data = request.get_json(force=True)
+        print("📥 Data diterima dari EA:", data)
 
-        # Pastikan data yang dikirim valid
+        # Validasi input
         if not data or 'symbol' not in data or 'timeframe' not in data or 'candles' not in data:
-            return jsonify({"error": "Invalid request data"}), 400
+            print("❌ Format data tidak valid")
+            return jsonify({"error": "Invalid request format"}), 400
 
-        prompt = f"""
-Symbol: {data['symbol']}
-Timeframe: {data['timeframe']}
-Candles: {data['candles']}
+        # Panggil fungsi strategi AI
+        signal_result = generate_signal(data)
+        print("📤 Sinyal dikirim ke EA:", signal_result)
 
-Berdasarkan data di atas dan menggunakan analisa EMA + Bollinger Bands, berikan sinyal BUY, SELL, atau HOLD. Sertakan juga SL dan TP.
-Jawab hanya dalam format:
-Action: BUY/SELL/HOLD
-SL: <angka>
-TP: <angka>
-"""
-
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=100
-        )
-
-        reply = response['choices'][0]['message']['content']
-        return jsonify({"response": reply})
+        return jsonify(signal_result)
 
     except Exception as e:
+        import traceback
+        print("🔥 ERROR INTERNAL SERVER 🔥")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
