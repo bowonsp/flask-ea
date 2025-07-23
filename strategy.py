@@ -1,51 +1,63 @@
+# strategy.py
+
 import os
 import openai
 
-# Ambil API key dari environment variable di Render
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def predict_signal(data):
-    price = data.get("price", 0)
-    symbol = data.get("symbol", "")
-    rsi = data.get("rsi", 50)
-
-    prompt = f"""
-    Pair: {symbol}
-    Price: {price}
-    RSI: {rsi}
-
-    Berdasarkan data di atas, apa sinyal trading yang paling tepat?
-    Jawab hanya dengan salah satu dari: BUY, SELL, atau HOLD.
     """
-
+    Fungsi ini mengirim data indikator teknikal ke OpenAI dan mengembalikan sinyal trading.
+    """
     try:
-        response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",  # ganti ke "gpt-3.5-turbo" jika akun kamu tidak punya akses GPT-4
-            messages=[
-                {"role": "system", "content": "Kamu adalah analis teknikal profesional yang memberikan sinyal trading secara akurat."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
+        symbol = data.get("symbol", "")
+        price = data.get("price", 0)
+        rsi = data.get("rsi", 0)
+        ema = data.get("ema", 0)
+        bb_upper = data.get("bb_upper", 0)
+        bb_lower = data.get("bb_lower", 0)
+        ema_period = data.get("ema_period", 14)
+        bb_period = data.get("bb_period", 20)
+
+        prompt = f"""
+Pasangan: {symbol}
+Harga Saat Ini: {price}
+RSI: {rsi}
+EMA({ema_period}): {ema}
+Bollinger Bands({bb_period}): Upper={bb_upper}, Lower={bb_lower}
+
+Berdasarkan data teknikal di atas, beri sinyal trading dalam format JSON seperti berikut:
+{{
+  \"signal\": \"BUY/SELL/HOLD\",
+  \"tp\": <Take Profit>,
+  \"sl\": <Stop Loss>
+}}
+"""
+
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
         )
 
-        signal_text = response.choices[0].message.content.strip().upper()
+        # Parsing response
+        reply = response.choices[0].message.content.strip()
 
-        # Hitung TP/SL berdasarkan sinyal
-        pip_size = 1 if price > 1000 else 0.0001  # BTCUSD pakai pip 1, forex pakai 0.0001
-        if signal_text == "BUY":
-            tp = price + 50 * pip_size
-            sl = price - 50 * pip_size
-        elif signal_text == "SELL":
-            tp = price - 50 * pip_size
-            sl = price + 50 * pip_size
-        else:
-            tp = price
-            sl = price
+        signal = "HOLD"
+        tp = price
+        sl = price
+
+        if '"signal"' in reply:
+            signal = reply.split('"signal"')[1].split('"')[1].upper()
+        if '"tp"' in reply:
+            tp = float(reply.split('"tp"')[1].split(',')[0].strip(": ").replace("}", ""))
+        if '"sl"' in reply:
+            sl = float(reply.split('"sl"')[1].split('}')[0].strip(": "))
 
         return {
-            "signal": signal_text,
-            "tp": round(tp, 5),
-            "sl": round(sl, 5)
+            "signal": signal,
+            "tp": tp,
+            "sl": sl
         }
 
     except Exception as e:
