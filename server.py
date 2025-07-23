@@ -1,13 +1,15 @@
 from flask import Flask, request, jsonify
-from strategy import generate_signal
+from flask_cors import CORS
 import os
+from strategy import generate_signal
 
 app = Flask(__name__)
+CORS(app)  # <- penting
 
 @app.route('/signal', methods=['POST'])
 def signal():
     try:
-        data = request.get_json(force=True)  # Paksa baca JSON
+        data = request.get_json(force=True)
         symbol = data.get("symbol")
         close_prices = data.get("close", [])
 
@@ -15,8 +17,7 @@ def signal():
             return jsonify({"error": "Missing symbol or close data"}), 400
 
         result = generate_signal(close_prices)
-
-        return jsonify({"signal": result}), 200  # <- Fix di sini!
+        return jsonify({"signal": result}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
