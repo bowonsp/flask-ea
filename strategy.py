@@ -1,14 +1,14 @@
-def generate_signal(data):
-    candles = data.get("candles", [])
-    if len(candles) < 2:
-        return {"signal": "HOLD"}
 
-    last_close = candles[-1]["close"]
-    prev_close = candles[-2]["close"]
+def generate_signal(close_prices):
+    if len(close_prices) < 10:
+        return "HOLD"
 
-    if last_close > prev_close:
-        return {"signal": "BUY", "tp": last_close + 10, "sl": last_close - 10}
-    elif last_close < prev_close:
-        return {"signal": "SELL", "tp": last_close - 10, "sl": last_close + 10}
+    last = close_prices[-1]
+    avg = sum(close_prices[-5:]) / 5
+
+    if last > avg:
+        return "BUY"
+    elif last < avg:
+        return "SELL"
     else:
-        return {"signal": "HOLD"}
+        return "HOLD"
