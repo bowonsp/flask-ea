@@ -1,55 +1,58 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import openai
 import os
 
+# Inisialisasi Flask dan OpenAI
 app = Flask(__name__)
-CORS(app)
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Ganti dengan API key kamu di Render (pakai secret environment variable)
-openai.api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    raise RuntimeError("OPENAI_API_KEY tidak ditemukan di environment variables.")
+
+client = openai.OpenAI(api_key=openai_api_key)
+
+# Fungsi bantu buat prompt dari data candle
+def build_prompt(data):
+    close_prices = data.get("close", [])
+    symbol = data.get("symbol", "UNKNOWN")
+    timeframe = data.get("timeframe", "M1")
+    
+    prompt = (
+        f"Analisis sinyal trading berdasarkan data harga penutupan berikut untuk {symbol} timeframe {timeframe}:\n"
+        f"{close_prices}\n\n"
+        "Berdasarkan data ini, apakah sinyal trading saat ini adalah BUY, SELL, atau HOLD? "
+        "Jawab hanya dengan salah satu: BUY, SELL, atau HOLD."
+    )
+    return prompt
 
 @app.route("/signal", methods=["POST"])
 def signal():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"error": "Data JSON tidak valid"}), 400
 
-        symbol = data.get("symbol", "Unknown")
-        timeframe = data.get("timeframe", "Unknown")
-        close = data.get("close", [])
+        prompt = build_prompt(data)
 
-        if not close or not isinstance(close, list):
-            return jsonify({"error": "Invalid or missing 'close' data"}), 400
-
-        prompt = f"""
-Data candle terakhir:
-Symbol: {symbol}, Timeframe: {timeframe}
-Close prices: {close}
-
-Berdasarkan data ini dan indikator teknikal seperti Bollinger Bands dan EMA, beri sinyal BUY, SELL, atau HOLD.
-Jawaban hanya boleh 1 kata (BUY, SELL, atau HOLD).
-"""
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # atau "gpt-4" jika kamu pakai GPT-4
+        # Kirim ke OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4",
             messages=[
-                {"role": "system", "content": "Kamu adalah analis trading profesional."},
+                {"role": "system", "content": "Kamu adalah asisten trading."},
                 {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-            max_tokens=10
+            ]
         )
 
-        reply = response["choices"][0]["message"]["content"].strip().upper()
+        ai_reply = response.choices[0].message.content.strip().upper()
 
-        if reply not in ["BUY", "SELL", "HOLD"]:
-            reply = "HOLD"
+        # Validasi respons
+        if ai_reply not in ["BUY", "SELL", "HOLD"]:
+            return jsonify({"signal": "HOLD", "note": "Respons AI tidak dikenali: " + ai_reply}), 200
 
-        return jsonify({"signal": reply})
+        return jsonify({"signal": ai_reply})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Untuk Render
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(debug=True)
