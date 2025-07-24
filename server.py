@@ -11,7 +11,8 @@ CORS(app)
 @app.route('/signal', methods=['POST'])
 def signal():
     try:
-        data = request.get_json()
+        data = request.get_json(force=True)  # <= WAJIB pakai force=True
+        print("Data diterima dari EA:", data)
         close_prices = data.get('close', [])
         symbol = data.get('symbol', 'UNKNOWN')
         timeframe = data.get('timeframe', 'UNKNOWN')
