@@ -1,42 +1,45 @@
-from flask import Flask, request, jsonify
-import openai
 import os
-import traceback  # Tambah ini
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import openai
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route('/signal', methods=['POST'])
 def signal():
     try:
-        data = request.get_json(force=True)
-        closes = data.get("close", [])
+        data = request.get_json()
+        close_prices = data.get('close', [])
+        symbol = data.get('symbol', 'UNKNOWN')
+        timeframe = data.get('timeframe', 'UNKNOWN')
 
-        if not closes:
-            return jsonify({"error": "Missing close data"}), 400
+        if not close_prices or len(close_prices) < 2:
+            return jsonify({"error": "Invalid close prices"}), 400
 
-        prompt = f"Beri sinyal BUY / SELL / HOLD berdasarkan data close berikut: {closes}"
-
-        response = openai.chat.completions.create(  # ✅ API format baru
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Kamu adalah analis teknikal trading."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
-            max_tokens=20
+        prompt = (
+            f"Berikan sinyal trading BUY, SELL, atau HOLD berdasarkan tren dari data close berikut:\n"
+            f"{close_prices}\n\n"
+            f"Jawaban satu kata saja, tanpa penjelasan."
         )
 
-        signal = response.choices[0].message.content.strip()
-        return jsonify({"signal": signal})
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=5
+        )
 
+        ai_reply = response.choices[0].message.content.strip().upper()
+        # Filter hanya BUY/SELL/HOLD
+        if ai_reply not in ["BUY", "SELL", "HOLD"]:
+            ai_reply = "HOLD"
+
+        return jsonify({"signal": ai_reply})
     except Exception as e:
-        print("==== ERROR SERVER ====")
-        print(e)
-        traceback.print_exc()  # ✅ Tambah log lengkap di server
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
