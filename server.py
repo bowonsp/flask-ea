@@ -16,19 +16,28 @@ def home():
 @app.route('/signal', methods=['POST'])
 def signal():
     try:
-        # Pakai force=True agar EA tidak ditolak
         data = request.get_json(force=True)
-except Exception as e:
-    print("JSON decode error:", str(e))
-    return jsonify({'error': f'Invalid JSON. {str(e)}'}), 400
+    except Exception as e:
+        print("JSON decode error:", str(e))
+        return jsonify({'error': f'Invalid JSON. {str(e)}'}), 400
 
-        # Ambil data yang diperlukan
-        close_prices = data.get("close", [])
-        symbol = data.get("symbol", "UNKNOWN")
-        timeframe = data.get("timeframe", "M1")
+    # Debug data yang diterima
+    print("Data diterima:", data)
 
-        if not close_prices or len(close_prices) != 10:
-            return jsonify({"error": "Invalid close data"}), 400
+    close_prices = data.get('close', [])
+    if not close_prices:
+        return jsonify({'error': 'Data close kosong atau tidak ditemukan'}), 400
+
+    # Logika sinyal sederhana
+    if close_prices[-1] > close_prices[0]:
+        signal = "BUY"
+    elif close_prices[-1] < close_prices[0]:
+        signal = "SELL"
+    else:
+        signal = "HOLD"
+
+    print("Sinyal:", signal)
+    return jsonify({'signal': signal})
 
         prompt = f"""
         Berdasarkan data harga penutupan terakhir berikut ini untuk {symbol} ({timeframe}):
