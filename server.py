@@ -18,7 +18,9 @@ def signal():
     try:
         # Pakai force=True agar EA tidak ditolak
         data = request.get_json(force=True)
-        print("Data diterima dari EA:", data)
+except Exception as e:
+    print("JSON decode error:", str(e))
+    return jsonify({'error': f'Invalid JSON. {str(e)}'}), 400
 
         # Ambil data yang diperlukan
         close_prices = data.get("close", [])
