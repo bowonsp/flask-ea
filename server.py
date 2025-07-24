@@ -48,9 +48,11 @@ def signal():
         return jsonify({"signal": reply.strip()})
 
     except Exception as e:
-        print("ERROR SERVER:", str(e))
+        import traceback
+        error_msg = traceback.format_exc()
+        print("ERROR DETAIL:\n", error_msg)
         return jsonify({"error": str(e)}), 500
-
+        
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
